@@ -103,22 +103,26 @@ class SiteWatcher(threading.Thread):
     """Periodically checks the site for up-ness and emails the admin of
     the site if the site is down"""
 
-    def __init__(self, site, client, emailer):
-        threading.Thread.__init__(self)
+    def __init__(self, site, client, emailer, fork=True):
+        if fork:  # for single threaded testing
+            threading.Thread.__init__(self)
         self.site = site
         self.client = client
         self.emailer = emailer
 
+    def run_check(self):
+        self.site.check_is_up(self.client)
+        if not self.site.up:
+            log.info("%s down" % self.site)
+            self.emailer.send_message(self.site.admin_email,
+                                     "Site %s down" % self.site,
+                                     self.site.last_error)
+        else:
+            log.debug("%s up" % self.site)
+
     def run(self):
         while True:
-            self.site.check_is_up(self.client)
-            if not self.site.up:
-                log.info("%s down" % self.site)
-                self.emailer.send_message(self.site.admin_email,
-                                         "Site %s down" % self.site,
-                                         self.site.last_error)
-            else:
-                log.debug("%s up" % self.site)
+            self.run_check()
             time.sleep(self.site.watch_interval)
 
 
